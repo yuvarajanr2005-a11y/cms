@@ -8,6 +8,8 @@ import { NotificationToast } from "./components/NotificationToast";
 
 // Pages
 import { Login } from "./pages/Login";
+import { StudentLogin } from "./pages/StudentLogin";
+import { StaffLogin } from "./pages/StaffLogin";
 import { Register } from "./pages/Register";
 import { StudentDashboard } from "./pages/student/StudentDashboard";
 import { NewComplaint } from "./pages/student/NewComplaint";
@@ -20,6 +22,10 @@ import { AdminComplaints } from "./pages/admin/AdminComplaints";
 import { AdminUsers } from "./pages/admin/AdminUsers";
 import { AdminDepartments } from "./pages/admin/AdminDepartments";
 import { AdminAuditLogs } from "./pages/admin/AdminAuditLogs";
+import { NaacInspectionPage } from "./pages/naac/NaacInspectionPage";
+import { NaacActionConfirmPage } from "./pages/naac/NaacActionConfirmPage";
+import { QrScannerPage } from "./pages/QrScannerPage";
+import { QrGeneratorPage } from "./pages/QrGeneratorPage";
 
 // Layout wrapper for authenticated pages
 const AppLayout = () => {
@@ -56,6 +62,7 @@ const ProtectedRoute = ({ allowedRoles = [] }) => {
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
     // Redirect to user's appropriate portal
     if (user.role === "admin") return <Navigate to="/admin/dashboard" replace />;
+    if (user.role === "naac") return <Navigate to="/naac/inspection" replace />;
     if (user.role === "staff") return <Navigate to="/staff/dashboard" replace />;
     return <Navigate to="/student/dashboard" replace />;
   }
@@ -70,6 +77,7 @@ const RootRedirect = () => {
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === "admin") return <Navigate to="/admin/dashboard" replace />;
+  if (user.role === "naac") return <Navigate to="/naac/inspection" replace />;
   if (user.role === "staff") return <Navigate to="/staff/dashboard" replace />;
   return <Navigate to="/student/dashboard" replace />;
 };
@@ -82,6 +90,8 @@ export default function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
+            <Route path="/student/login" element={<StudentLogin />} />
+            <Route path="/staff/login" element={<StaffLogin />} />
             <Route path="/register" element={<Register />} />
             <Route path="/" element={<RootRedirect />} />
 
@@ -90,7 +100,11 @@ export default function App() {
               {/* Shared Authenticated Routes */}
               <Route element={<ProtectedRoute />}>
                 <Route path="/complaints/:id" element={<ComplaintDetails />} />
+                <Route path="/complaints/:id/naac-confirm" element={<NaacActionConfirmPage />} />
+                <Route path="/naac/inspection" element={<NaacInspectionPage />} />
                 <Route path="/student/feed" element={<PublicFeed />} />
+                <Route path="/scan" element={<QrScannerPage />} />
+                <Route path="/qr-generator" element={<QrGeneratorPage />} />
               </Route>
 
               {/* Student Routes */}
@@ -99,8 +113,8 @@ export default function App() {
                 <Route path="/student/new" element={<NewComplaint />} />
               </Route>
 
-              {/* Staff Routes */}
-              <Route element={<ProtectedRoute allowedRoles={["staff", "admin"]} />}>
+              {/* Staff & NAAC Routes */}
+              <Route element={<ProtectedRoute allowedRoles={["staff", "admin", "naac"]} />}>
                 <Route path="/staff/dashboard" element={<StaffDashboard />} />
                 <Route path="/staff/performance" element={<StaffPerformance />} />
               </Route>

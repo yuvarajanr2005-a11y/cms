@@ -111,13 +111,23 @@ export const PublicFeed = () => {
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
         {[
           { label: "All Categories", value: "" },
-          { label: "Electrical", value: "electrical" },
-          { label: "Water Leakage", value: "leakage" },
-          { label: "Campus WiFi", value: "wifi" },
-          { label: "Furniture", value: "furniture" },
-          { label: "Plumbing", value: "plumbing" },
-          { label: "Cleaning", value: "cleaning" },
-          { label: "Other", value: "other" }
+          { label: "🚨 Anti-Ragging", value: "ragging" },
+          { label: "⚠️ Facility Misuse", value: "misuse" },
+          { label: "🛡️ Harassment", value: "harassment" },
+          { label: "🍲 Hostel Mess", value: "food_mess" },
+          { label: "🎓 Academic & Labs", value: "academic" },
+          { label: "⚡ Electrical", value: "electrical" },
+          { label: "💧 Water Leakage", value: "leakage" },
+          { label: "🔧 Plumbing", value: "plumbing" },
+          { label: "🏢 Hostel", value: "hostel" },
+          { label: "🚌 Transport", value: "transport" },
+          { label: "📶 WiFi", value: "wifi" },
+          { label: "📚 Library", value: "library" },
+          { label: "🏆 Sports", value: "sports" },
+          { label: "🪑 Furniture", value: "furniture" },
+          { label: "✨ Cleaning", value: "cleaning" },
+          { label: "🎨 Painting", value: "painting" },
+          { label: "❓ Other", value: "other" }
         ].map((pill) => (
           <button
             key={pill.value}

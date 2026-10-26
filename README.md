@@ -24,7 +24,10 @@ graph TD
 ## ✨ Core Highlights & Features
 
 ### 1. Authentication & Role-Based Access Control (RBAC)
-- **Roles**: `student`, `staff`, `admin`. Staff sub-types: `maintenance` or `department_head`.
+- **Roles**: `student`, `staff`, `admin`, `naac`. Staff sub-types: `maintenance` or `department_head`.
+- **Dedicated Common Student Login (`/student/login`)**: Tailored portal for all college students across departments (CSE, ECE, MECH, CIVIL) with instant demo accounts.
+- **Dedicated College Staff & NAAC Login (`/staff/login`)**: Operations portal for HODs, Technicians, Chief Warden, System Admins, and NAAC Peer Reviewers.
+- **Unified Portal (`/login`)**: Tabbed gateway for switching seamlessly between Student Portal and Staff & NAAC Portal.
 - **Student Email Constraint**: Self-registration is restricted strictly to `@college.edu` domains, enforced at both the Zod schema level and the `middleware/emailDomain.js` layer.
 - **Password Security**: Bcrypt with salt cost 12; enforces 8+ characters, uppercase, lowercase, numbers, and special characters.
 - **Session Architecture**: Short-lived access token (15m) in an `HttpOnly`, `SameSite=Lax/Strict` cookie with `Authorization: Bearer` fallback. Refresh Token Rotation (RTR, 7-day expiry) stored as a SHA-256 hash in the database and rotated on every refresh at `/api/auth/refresh`.
@@ -57,6 +60,11 @@ graph TD
 - `/api/admin/analytics/locations`: Heatmap ranking campus blocks, floors, and rooms by grievance density.
 - `/api/admin/analytics/staff-performance`: Technician scorecards with resolved counts, SLA compliance percentage, reopen penalty rates, and average star ratings.
 - `/api/admin/analytics/overview`: High-level metrics, breach ratios, and 30-day velocity trends.
+
+### 6. NAAC Severe Grievance Inspection & Action Confirmation Engine
+- **On-Site Inspection Visits (`/naac/inspection`)**: Severe safety hazards (electrical sparking, water contamination, lab infrastructure failures) trigger mandatory NAAC Committee inspection visits. The committee records physical inspection observations, verified severity, and visiting officer credentials.
+- **Dedicated NAAC Action Confirmation Page (`/complaints/:id/naac-confirm`)**: The NAAC Committee formulates and confirms binding action directives, strict SLA override deadlines (2h, 4h, 8h), and NAAC compliance grade ratings (A++, A+, A).
+- **Official Action Confirmation Slip**: Generates a verifiable, cryptographically logged Action Order Slip with unique Slip ID (`NAAC-ACT-2026-XXXX`), institutional seal, authorized signature, and printable/saveable accreditation record.
 
 ---
 
@@ -128,13 +136,16 @@ npm run frontend
 | Role | Name | Email | Password | Details |
 |---|---|---|---|---|
 | **Admin** | System Administrator | `admin@college.edu` | `Admin@Password123` | Full access, analytics, user & dept management |
+| **NAAC Officer** | Dr. K. Radhakrishnan | `naac.officer@college.edu` | `Naac@Password123` | NAAC Peer Reviewer & IQAC Inspection Authority |
 | **Chief Warden** | Dr. Arthur Pendelton | `chief.warden@college.edu` | `Warden@Password123` | Level 2 escalation supervisor |
 | **Staff (Head)** | Prof. Vikram Sarabhai | `elec.head@college.edu` | `Staff@Password123` | Electrical Dept Head |
 | **Staff (Tech)** | Rajesh Kumar | `elec.tech@college.edu` | `Staff@Password123` | Maintenance Electrician |
-| **Student 1** | Alex Johnson | `alex.student@college.edu` | `Student@Password123` | Regular student account |
-| **Student 2** | Priya Sharma | `priya.student@college.edu` | `Student@Password123` | Has ticket awaiting verification (Demo OTP: `4321`) |
+| **Student 1 (CSE)** | Alex Johnson | `alex.student@college.edu` | `Student@Password123` | Computer Science student account |
+| **Student 2 (ECE)** | Priya Sharma | `priya.student@college.edu` | `Student@Password123` | Electronics student (Ticket awaiting OTP: `4321`) |
+| **Student 3 (MECH)** | Rahul Verma | `rahul.student@college.edu` | `Student@Password123` | Mechanical student account |
+| **Student 4 (CIVIL)** | Sneha Patel | `sneha.student@college.edu` | `Student@Password123` | Civil Engineering student account |
 
-> **Pro-Tip**: The login page (`/login`) includes **1-Click Demo Account Buttons** to instantly log into any role without typing passwords.
+> **Pro-Tip**: Use `/student/login` for all students, `/staff/login` for all staff & NAAC members, or the unified `/login` portal with 1-click test login buttons.
 
 ---
 

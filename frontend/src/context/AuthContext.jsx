@@ -65,6 +65,7 @@ export const AuthProvider = ({ children }) => {
   const isStudent = user?.role === "student";
   const isStaff = user?.role === "staff";
   const isAdmin = user?.role === "admin";
+  const isNaac = user?.role === "naac";
 
   return (
     <AuthContext.Provider
@@ -77,7 +78,8 @@ export const AuthProvider = ({ children }) => {
         refreshUser: fetchCurrentUser,
         isStudent,
         isStaff,
-        isAdmin
+        isAdmin,
+        isNaac
       }}
     >
       {children}

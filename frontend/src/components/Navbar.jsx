@@ -7,13 +7,14 @@ import {
   Shield,
   Wrench,
   GraduationCap,
-  CheckCheck
+  CheckCheck,
+  Award
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
 
 export const Navbar = () => {
-  const { user, logout, isStudent, isStaff, isAdmin } = useAuth();
+  const { user, logout, isStudent, isStaff, isAdmin, isNaac } = useAuth();
   const { notifications, clearAllNotifications } = useSocket();
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -102,7 +103,11 @@ export const Navbar = () => {
               </div>
 
               <div className="flex items-center gap-1.5">
-                {isAdmin ? (
+                {isNaac ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-amber-950 text-amber-300 font-semibold shadow-sm border border-amber-600/50">
+                    <Award className="w-3 h-3 text-amber-400" /> NAAC Committee
+                  </span>
+                ) : isAdmin ? (
                   <span className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-neutral-900 text-white font-semibold shadow-sm">
                     <Shield className="w-3 h-3 text-red-400" /> Admin
                   </span>

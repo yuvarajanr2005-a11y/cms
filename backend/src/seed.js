@@ -50,6 +50,15 @@ export const seedDatabase = async ({ isCli = true } = {}) => {
       phone: "+91 9876500000"
     });
 
+    // 2b. Create NAAC Quality Committee Officer
+    const naacOfficer = await User.create({
+      name: "Dr. K. Radhakrishnan (NAAC Peer Reviewer)",
+      email: "naac.officer@college.edu",
+      password: "Naac@Password123",
+      role: ROLES.NAAC,
+      phone: "+91 9876599999"
+    });
+
     // 3. Create Departments
     const elecDept = await Department.create({
       name: "Electrical Maintenance & Power",
@@ -76,6 +85,34 @@ export const seedDatabase = async ({ isCli = true } = {}) => {
       name: "Civil Works & Facilities",
       code: "CIVIL",
       categoriesHandled: ["furniture", "painting", "cleaning", "other"],
+      escalationContact: chiefWarden._id
+    });
+
+    const antiRagDept = await Department.create({
+      name: "Anti-Ragging, Safety & Discipline Cell",
+      code: "ANTIRAG",
+      categoriesHandled: ["ragging", "harassment", "misuse"],
+      escalationContact: chiefWarden._id
+    });
+
+    const messDept = await Department.create({
+      name: "Hostel Food Quality & Canteen Hygiene Cell",
+      code: "MESS",
+      categoriesHandled: ["food_mess", "hostel"],
+      escalationContact: chiefWarden._id
+    });
+
+    const acadDept = await Department.create({
+      name: "Academic Affairs & Central Library Cell",
+      code: "ACAD",
+      categoriesHandled: ["academic", "library"],
+      escalationContact: chiefWarden._id
+    });
+
+    const transDept = await Department.create({
+      name: "Campus Transport & Sports Logistics",
+      code: "TRANS",
+      categoriesHandled: ["transport", "sports"],
       escalationContact: chiefWarden._id
     });
 
@@ -158,6 +195,33 @@ export const seedDatabase = async ({ isCli = true } = {}) => {
       }
     });
 
+    const antiRagHead = await User.create({
+      name: "Prof. Meenakshi Sundaram (Anti-Ragging Squad Head)",
+      email: "antirag.head@college.edu",
+      password: "Staff@Password123",
+      role: ROLES.STAFF,
+      staffType: STAFF_TYPES.DEPARTMENT_HEAD,
+      department: antiRagDept._id,
+      phone: "+91 9876555551"
+    });
+
+    const messStaff = await User.create({
+      name: "K. Narayanan (Hostel & Mess Warden)",
+      email: "mess.head@college.edu",
+      password: "Staff@Password123",
+      role: ROLES.STAFF,
+      staffType: STAFF_TYPES.MAINTENANCE,
+      department: messDept._id,
+      phone: "+91 9876555552",
+      performance: {
+        resolvedCount: 8,
+        avgResolutionMinutes: 35,
+        reopenedCount: 0,
+        totalRatingSum: 38,
+        ratingCount: 8
+      }
+    });
+
     // Associate department heads and staff
     elecDept.head = elecHead._id;
     elecDept.staff = [elecStaff._id];
@@ -171,6 +235,22 @@ export const seedDatabase = async ({ isCli = true } = {}) => {
 
     civilDept.staff = [civilStaff._id];
     await civilDept.save();
+
+    antiRagDept.head = antiRagHead._id;
+    antiRagDept.staff = [antiRagHead._id];
+    await antiRagDept.save();
+
+    messDept.head = messStaff._id;
+    messDept.staff = [messStaff._id];
+    await messDept.save();
+
+    acadDept.head = chiefWarden._id;
+    acadDept.staff = [chiefWarden._id];
+    await acadDept.save();
+
+    transDept.head = civilStaff._id;
+    transDept.staff = [civilStaff._id];
+    await transDept.save();
 
     // 5. Create Students
     const studentAlex = await User.create({
@@ -190,11 +270,19 @@ export const seedDatabase = async ({ isCli = true } = {}) => {
     });
 
     const studentRahul = await User.create({
-      name: "Rahul Verma",
+      name: "Rahul Verma (Mechanical)",
       email: "rahul.student@college.edu",
       password: "Student@Password123",
       role: ROLES.STUDENT,
       phone: "+91 9876544443"
+    });
+
+    const studentSneha = await User.create({
+      name: "Sneha Patel (Civil Eng)",
+      email: "sneha.student@college.edu",
+      password: "Student@Password123",
+      role: ROLES.STUDENT,
+      phone: "+91 9876544444"
     });
 
     // 6. Create Sample Complaints
@@ -230,6 +318,12 @@ export const seedDatabase = async ({ isCli = true } = {}) => {
         hours: h1,
         breached: false,
         escalationLevel: 0
+      },
+      naacReview: {
+        isSevere: true,
+        requiresInspection: true,
+        inspectionStatus: "pending_inspection",
+        verifiedSeverity: "Severe Hazard"
       },
       statusHistory: [
         {
@@ -292,6 +386,427 @@ export const seedDatabase = async ({ isCli = true } = {}) => {
           status: STATUSES.ESCALATED,
           at: new Date(Date.now() - 2 * 60 * 60 * 1000),
           note: "Auto-escalated to Department Head due to SLA breach"
+        }
+      ],
+      naacReview: {
+        isSevere: true,
+        requiresInspection: true,
+        inspectionStatus: "pending_inspection",
+        verifiedSeverity: "Critical Hazard - Water Inundation"
+      }
+    });
+
+    // 2c. NAAC Severe Complaint - On-site Inspection Visit Conducted, Awaiting Action Confirmation
+    const complaintSevereInspected = await Complaint.create({
+      title: "Main Power Distribution Panel Sparking Hazard in Lab 304",
+      description: "Main 3-phase electrical panel outside Server Lab 3 has loose terminals, heavy burning odor, and repeated sparks endangering 60+ students.",
+      category: "electrical",
+      department: elecDept._id,
+      priority: PRIORITIES.EMERGENCY,
+      priorityScore: 85,
+      status: STATUSES.IN_PROGRESS,
+      location: {
+        block: "Academic Block 1",
+        floor: "3rd Floor",
+        room: "Room 301",
+        fullPath: "Academic Block 1 > 3rd Floor > Room 301"
+      },
+      attachments: [
+        {
+          url: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600",
+          publicId: "seed/panel_hazard"
+        }
+      ],
+      createdBy: studentAlex._id,
+      isAnonymous: false,
+      assignedTo: elecStaff._id,
+      assignedAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+      upvotes: [studentPriya._id, studentRahul._id, studentSneha._id],
+      upvoteCount: 3,
+      sla: {
+        dueAt: new Date(Date.now() + 4 * 60 * 60 * 1000),
+        hours: 6,
+        breached: false,
+        escalationLevel: 0
+      },
+      naacReview: {
+        isSevere: true,
+        requiresInspection: true,
+        inspectionStatus: "inspected",
+        inspectedAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
+        inspectedBy: naacOfficer._id,
+        inspectorName: "Dr. K. Radhakrishnan",
+        inspectorDesignation: "NAAC Peer Team Head / Institutional Accreditation Officer",
+        inspectionFindings: "Physical inspection conducted at Computer Lab 301. Live copper busbars exposed without insulated safety barrier. Fire extinguisher expired. Severe risk to students. Immediate executive action required.",
+        verifiedSeverity: "Critical Infrastructure Failure",
+        directiveSlaHours: 4
+      },
+      statusHistory: [
+        {
+          status: STATUSES.SUBMITTED,
+          changedBy: studentAlex._id,
+          at: new Date(Date.now() - 3 * 60 * 60 * 1000),
+          note: "Submitted by student - Emergency safety hazard."
+        },
+        {
+          status: STATUSES.ASSIGNED,
+          changedBy: null,
+          at: new Date(Date.now() - 2.5 * 60 * 60 * 1000),
+          note: `Auto-routed & assigned to technician Rajesh Kumar (Electrical Maintenance & Power)`
+        },
+        {
+          status: STATUSES.IN_PROGRESS,
+          changedBy: naacOfficer._id,
+          at: new Date(Date.now() - 1 * 60 * 60 * 1000),
+          note: `NAAC On-site Inspection completed by Dr. K. Radhakrishnan (NAAC Peer Team Head). Verified as Critical Infrastructure Failure.`
+        }
+      ]
+    });
+
+    // 2d. NAAC Severe Complaint - Action Taken & Confirmed with Official Confirmation Slip
+    const complaintActionConfirmed = await Complaint.create({
+      title: "Drinking Water Pipeline Contamination in Hostel Block B",
+      description: "Turbid water observed in 1st floor water coolers with foul sulfur odor. Immediate safety violation affecting residential students.",
+      category: "plumbing",
+      department: plumbDept._id,
+      priority: PRIORITIES.EMERGENCY,
+      priorityScore: 92,
+      status: STATUSES.IN_PROGRESS,
+      location: {
+        block: "Hostel Block B (Girls)",
+        floor: "1st Floor",
+        room: "Washroom North",
+        fullPath: "Hostel Block B (Girls) > 1st Floor > Washroom North"
+      },
+      attachments: [
+        {
+          url: "https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=600",
+          publicId: "seed/water_pipeline"
+        }
+      ],
+      createdBy: studentPriya._id,
+      isAnonymous: false,
+      assignedTo: plumbStaff._id,
+      assignedAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+      upvotes: [studentAlex._id, studentRahul._id],
+      upvoteCount: 2,
+      sla: {
+        dueAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
+        hours: 6,
+        breached: false,
+        escalationLevel: 0
+      },
+      naacReview: {
+        isSevere: true,
+        requiresInspection: true,
+        inspectionStatus: "action_confirmed",
+        inspectedAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
+        inspectedBy: naacOfficer._id,
+        inspectorName: "Dr. K. Radhakrishnan",
+        inspectorDesignation: "NAAC Peer Team Head",
+        inspectionFindings: "Inspected water filtration unit. Biofilm accumulation and backflow noticed. Station requires immediate chemical sanitization and membrane replacement.",
+        verifiedSeverity: "Severe Hazard",
+        actionType: "Emergency Budget Sanction & Alternative Drinking Water Deployed",
+        actionDetails: "Station shut down immediately. Sanctioned Rs. 45,000 for RO membrane replacement and chemical flush. 200L packaged mineral water dispensers deployed on each floor for student safety.",
+        actionConfirmedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        actionConfirmedBy: naacOfficer._id,
+        actionConfirmationSlipId: "NAAC-ACT-2026-7821",
+        complianceGrade: "A+",
+        directiveSlaHours: 4
+      },
+      statusHistory: [
+        {
+          status: STATUSES.SUBMITTED,
+          changedBy: studentPriya._id,
+          at: new Date(Date.now() - 5 * 60 * 60 * 1000),
+          note: "Submitted by student - Health hazard"
+        },
+        {
+          status: STATUSES.IN_PROGRESS,
+          changedBy: naacOfficer._id,
+          at: new Date(Date.now() - 2 * 60 * 60 * 1000),
+          note: "NAAC Official Action Confirmed: [Emergency Budget Sanction & Alternative Drinking Water Deployed]. Slip ID: NAAC-ACT-2026-7821"
+        }
+      ]
+    });
+
+    // 2e. Anti-Ragging Emergency Grievance (Strict Zero Tolerance)
+    const complaintRagging = await Complaint.create({
+      title: "Senior Students Forcing Freshers to Attend Midnight Sessions in Hostel Block A",
+      description: "A group of 3rd year students entered 1st year fresher rooms (Room 101 & 102) past 11 PM, verbally abusing freshers, forcing humiliating acts, and issuing physical threats. Emergency intervention requested under Supreme Court / UGC Anti-Ragging Mandate.",
+      category: "ragging",
+      department: antiRagDept._id,
+      priority: PRIORITIES.EMERGENCY,
+      priorityScore: 98,
+      status: STATUSES.IN_PROGRESS,
+      location: {
+        block: "Hostel Block A (Boys)",
+        floor: "1st Floor",
+        room: "Room 101",
+        fullPath: "Hostel Block A (Boys) > 1st Floor > Room 101"
+      },
+      attachments: [
+        {
+          url: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600",
+          publicId: "seed/ragging_hall"
+        }
+      ],
+      createdBy: studentRahul._id,
+      isAnonymous: true,
+      assignedTo: antiRagHead._id,
+      assignedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      upvotes: [studentAlex._id, studentPriya._id, studentSneha._id],
+      upvoteCount: 8,
+      sla: {
+        dueAt: new Date(Date.now() + 3 * 60 * 60 * 1000),
+        hours: 6,
+        breached: false,
+        escalationLevel: 0
+      },
+      naacReview: {
+        isSevere: true,
+        requiresInspection: true,
+        inspectionStatus: "inspected",
+        inspectedAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
+        inspectedBy: naacOfficer._id,
+        inspectorName: "Dr. K. Radhakrishnan",
+        inspectorDesignation: "NAAC Peer Team Head / Anti-Ragging External Monitor",
+        inspectionFindings: "Emergency on-site visit conducted at Hostel Block A with Chief Warden. Interviewed freshers and recorded hostel biometric entry logs. Identified 4 senior students. Zero-tolerance statutory action recommended.",
+        verifiedSeverity: "Critical Anti-Ragging Violation",
+        directiveSlaHours: 2
+      },
+      statusHistory: [
+        {
+          status: STATUSES.SUBMITTED,
+          changedBy: studentRahul._id,
+          at: new Date(Date.now() - 2 * 60 * 60 * 1000),
+          note: "🚨 Emergency Anti-Ragging ticket filed anonymously."
+        },
+        {
+          status: STATUSES.ASSIGNED,
+          changedBy: null,
+          at: new Date(Date.now() - 1.8 * 60 * 60 * 1000),
+          note: `Assigned immediately to Anti-Ragging Squad Head Prof. Meenakshi Sundaram.`
+        },
+        {
+          status: STATUSES.IN_PROGRESS,
+          changedBy: naacOfficer._id,
+          at: new Date(Date.now() - 1 * 60 * 60 * 1000),
+          note: `NAAC Committee & Anti-Ragging Cell On-Site Visit completed. Severity set to Critical Anti-Ragging Violation.`
+        }
+      ]
+    });
+
+    // 2f. Misuse of College Laboratory & Assets
+    const complaintMisuse = await Complaint.create({
+      title: "Unauthorized Misuse & Vandalism of Advanced Computing Cluster in Lab 304",
+      description: "High-performance GPU workstations in Server Lab 304 are being misused after hours for unauthorized commercial rendering and crypto mining. Cooling ducts dismantled and equipment overheated beyond safe operating temperatures.",
+      category: "misuse",
+      department: antiRagDept._id,
+      priority: PRIORITIES.HIGH,
+      priorityScore: 78,
+      status: STATUSES.IN_PROGRESS,
+      location: {
+        block: "Academic Block 1",
+        floor: "3rd Floor",
+        room: "Computer Lab A",
+        fullPath: "Academic Block 1 > 3rd Floor > Computer Lab A"
+      },
+      attachments: [
+        {
+          url: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=600",
+          publicId: "seed/gpu_cluster"
+        }
+      ],
+      createdBy: studentAlex._id,
+      isAnonymous: false,
+      assignedTo: antiRagHead._id,
+      assignedAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
+      upvotes: [studentRahul._id],
+      upvoteCount: 3,
+      sla: {
+        dueAt: new Date(Date.now() + 12 * 60 * 60 * 1000),
+        hours: 24,
+        breached: false,
+        escalationLevel: 0
+      },
+      naacReview: {
+        isSevere: true,
+        requiresInspection: true,
+        inspectionStatus: "action_confirmed",
+        inspectedAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+        inspectedBy: naacOfficer._id,
+        inspectorName: "Dr. K. Radhakrishnan",
+        inspectorDesignation: "NAAC Institutional Reviewer",
+        inspectionFindings: "Hardware diagnostics revealed 3 GPU nodes operating at 94°C with non-academic background tasks. Lab entry logs cross-referenced with security cameras.",
+        verifiedSeverity: "Campus Property & Resource Misuse",
+        actionType: "Access Revocation, Hardware Audit & Biometric Lab Security Sanction",
+        actionDetails: "Immediate deauthorization of flagged student IDs. System re-imaged with restricted OS profiles. Sanctioned installation of RFID biometric lock on Lab 304.",
+        actionConfirmedAt: new Date(Date.now() - 1 * 60 * 60 * 1000),
+        actionConfirmedBy: naacOfficer._id,
+        actionConfirmationSlipId: "NAAC-ACT-2026-9042",
+        complianceGrade: "A+",
+        directiveSlaHours: 4
+      },
+      statusHistory: [
+        {
+          status: STATUSES.SUBMITTED,
+          changedBy: studentAlex._id,
+          at: new Date(Date.now() - 4 * 60 * 60 * 1000),
+          note: "Submitted by student"
+        },
+        {
+          status: STATUSES.IN_PROGRESS,
+          changedBy: naacOfficer._id,
+          at: new Date(Date.now() - 1 * 60 * 60 * 1000),
+          note: "NAAC Action Confirmed: [Access Revocation, Hardware Audit & Biometric Lab Security Sanction]. Slip ID: NAAC-ACT-2026-9042"
+        }
+      ]
+    });
+
+    // 2g. Hostel Mess & Food Quality Grievance
+    const complaintFoodMess = await Complaint.create({
+      title: "Contaminated Drinking Water & Undercooked Food in Central Hostel Mess",
+      description: "Severe hygiene issue in Central Mess Hall 2: Insects found in vegetable curry and rice was half-cooked. Over 15 hostel students reported food poisoning symptoms. Urgent kitchen inspection needed.",
+      category: "food_mess",
+      department: messDept._id,
+      priority: PRIORITIES.HIGH,
+      priorityScore: 72,
+      status: STATUSES.IN_PROGRESS,
+      location: {
+        block: "Hostel Block A (Boys)",
+        floor: "Ground Floor",
+        room: "Mess Area",
+        fullPath: "Hostel Block A (Boys) > Ground Floor > Mess Area"
+      },
+      attachments: [
+        {
+          url: "https://images.unsplash.com/photo-1584467735871-8e85353a8413?w=600",
+          publicId: "seed/mess_hygiene"
+        }
+      ],
+      createdBy: studentRahul._id,
+      isAnonymous: false,
+      assignedTo: messStaff._id,
+      assignedAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
+      upvotes: [studentAlex._id, studentPriya._id, studentSneha._id],
+      upvoteCount: 6,
+      sla: {
+        dueAt: new Date(Date.now() + 6 * 60 * 60 * 1000),
+        hours: 24,
+        breached: false,
+        escalationLevel: 0
+      },
+      naacReview: {
+        isSevere: true,
+        requiresInspection: true,
+        inspectionStatus: "pending_inspection",
+        verifiedSeverity: "Severe Hazard"
+      },
+      statusHistory: [
+        {
+          status: STATUSES.SUBMITTED,
+          changedBy: studentRahul._id,
+          at: new Date(Date.now() - 6 * 60 * 60 * 1000),
+          note: "Submitted by hostel resident"
+        }
+      ]
+    });
+
+    // 2h. Harassment & Campus Women Safety Grievance
+    const complaintHarassment = await Complaint.create({
+      title: "Extinguished Floodlights and Harassment Incidents on East Campus Pedestrian Walkway",
+      description: "The 350-meter pathway between the Library and Girls Hostel has had completely non-functional lighting for 4 days. Unidentified outsiders have been spotted loitering and catcalling female students. Immediate security deployment and light restoration required.",
+      category: "harassment",
+      department: antiRagDept._id,
+      priority: PRIORITIES.EMERGENCY,
+      priorityScore: 95,
+      status: STATUSES.IN_PROGRESS,
+      location: {
+        block: "Hostel Block B (Girls)",
+        floor: "Ground Floor",
+        room: "Common Hall",
+        fullPath: "Hostel Block B (Girls) > Ground Floor > Common Hall"
+      },
+      attachments: [
+        {
+          url: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600",
+          publicId: "seed/dark_walkway"
+        }
+      ],
+      createdBy: studentSneha._id,
+      isAnonymous: false,
+      assignedTo: antiRagHead._id,
+      assignedAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+      upvotes: [studentPriya._id, studentAlex._id],
+      upvoteCount: 5,
+      sla: {
+        dueAt: new Date(Date.now() + 3 * 60 * 60 * 1000),
+        hours: 6,
+        breached: false,
+        escalationLevel: 0
+      },
+      naacReview: {
+        isSevere: true,
+        requiresInspection: true,
+        inspectionStatus: "inspected",
+        inspectedAt: new Date(Date.now() - 1.5 * 60 * 60 * 1000),
+        inspectedBy: naacOfficer._id,
+        inspectorName: "Dr. K. Radhakrishnan",
+        inspectorDesignation: "NAAC Peer Team Head",
+        inspectionFindings: "Night-time walk audit conducted along East Campus walkway with Security Chief. 6 solar floodlight panels found disconnected. Poses severe threat to student safety. Security patrol post mandated immediately.",
+        verifiedSeverity: "Zero Tolerance Critical Safety",
+        directiveSlaHours: 4
+      },
+      statusHistory: [
+        {
+          status: STATUSES.SUBMITTED,
+          changedBy: studentSneha._id,
+          at: new Date(Date.now() - 3 * 60 * 60 * 1000),
+          note: "Emergency women safety grievance filed."
+        }
+      ]
+    });
+
+    // 2i. Academic / Laboratory Equipment Breakdown
+    const complaintAcademic = await Complaint.create({
+      title: "Faulty Digital Storage Oscilloscopes & Burned DC Power Supplies in VLSI Lab",
+      description: "Benches 4 through 8 in Electronics Lab 202 have non-responsive digital oscilloscopes and blown fuses in power supply units. End-semester practical examinations commence on Monday.",
+      category: "academic",
+      department: acadDept._id,
+      priority: PRIORITIES.HIGH,
+      priorityScore: 68,
+      status: STATUSES.ASSIGNED,
+      location: {
+        block: "Academic Block 1",
+        floor: "2nd Floor",
+        room: "Room 201",
+        fullPath: "Academic Block 1 > 2nd Floor > Room 201"
+      },
+      attachments: [
+        {
+          url: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600",
+          publicId: "seed/vlsi_lab"
+        }
+      ],
+      createdBy: studentPriya._id,
+      isAnonymous: false,
+      assignedTo: elecStaff._id,
+      assignedAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
+      upvotes: [studentAlex._id],
+      upvoteCount: 2,
+      sla: {
+        dueAt: new Date(Date.now() + 18 * 60 * 60 * 1000),
+        hours: 24,
+        breached: false,
+        escalationLevel: 0
+      },
+      statusHistory: [
+        {
+          status: STATUSES.SUBMITTED,
+          changedBy: studentPriya._id,
+          at: new Date(Date.now() - 4 * 60 * 60 * 1000),
+          note: "Submitted by ECE student"
         }
       ]
     });
@@ -435,12 +950,15 @@ export const seedDatabase = async ({ isCli = true } = {}) => {
     console.log("=================================================================");
     console.log("📋 Demo Credentials:");
     console.log("1. Admin:                               admin@college.edu / Admin@Password123");
-    console.log("2. Staff - Maintenance Electrician:     elec.tech@college.edu / Staff@Password123");
-    console.log("3. Staff - Maintenance Civil:           civil.tech@college.edu / Staff@Password123");
-    console.log("4. Staff - Department Head:             elec.head@college.edu / Staff@Password123");
-    console.log("5. Staff - Chief Warden:                chief.warden@college.edu / Warden@Password123");
-    console.log("6. Student 1:                           alex.student@college.edu / Student@Password123");
-    console.log(`7. Student 2 (Pending Verification):    priya.student@college.edu / Student@Password123 (Ticket: ${complaint3.ticketId}, OTP: 4321)`);
+    console.log("2. NAAC Quality Reviewer:               naac.officer@college.edu / Naac@Password123");
+    console.log("3. Staff - Maintenance Electrician:     elec.tech@college.edu / Staff@Password123");
+    console.log("4. Staff - Maintenance Plumber:         plumb.tech@college.edu / Staff@Password123");
+    console.log("5. Staff - Department Head:             elec.head@college.edu / Staff@Password123");
+    console.log("6. Staff - Chief Warden:                chief.warden@college.edu / Warden@Password123");
+    console.log("7. Student 1 (CSE):                     alex.student@college.edu / Student@Password123");
+    console.log(`8. Student 2 (ECE):                     priya.student@college.edu / Student@Password123 (Ticket: ${complaint3.ticketId}, OTP: 4321)`);
+    console.log("9. Student 3 (Mechanical):              rahul.student@college.edu / Student@Password123");
+    console.log("10. Student 4 (Civil Eng):              sneha.student@college.edu / Student@Password123");
     console.log("=================================================================");
 
     if (isCli) {

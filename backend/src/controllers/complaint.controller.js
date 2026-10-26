@@ -12,12 +12,15 @@ import {
   CAMPUS_LOCATIONS,
   AUDIT_ACTIONS,
   VERIFICATION_METHODS,
-  ROLES
+  ROLES,
+  NAAC_INSPECTION_STATUSES
 } from "../utils/constants.js";
 import { calculatePriorityAndScore } from "../utils/priority.js";
 import { calculateSlaDueAt, recomputeSlaOnPriorityChange } from "../services/sla.service.js";
 import { verifyResolutionOtp } from "../services/otp.service.js";
 import { createAuditLog } from "../services/audit.service.js";
+import { escalateComplaint } from "../services/escalation.service.js";
+
 import {
   processUploadsToCloudinary,
   cleanupUploadedAssets
@@ -27,7 +30,9 @@ import {
   notifyComplaintStatusUpdated,
   notifyComplaintUpvoted,
   notifyComplaintReopened,
-  notifyComplaintAssigned
+  notifyComplaintAssigned,
+  notifyNaacInspected,
+  notifyNaacActionConfirmed
 } from "../services/notification.service.js";
 
 // Zod schemas for complaints
@@ -38,7 +43,26 @@ export const createComplaintSchema = z.object({
   block: z.string().min(1, "Location block is required"),
   floor: z.string().min(1, "Location floor is required"),
   room: z.string().min(1, "Location room is required"),
-  isAnonymous: z.union([z.boolean(), z.string().transform((v) => v === "true")]).optional()
+  studentName: z.string().optional(),
+  studentDept: z.string().optional(),
+  isAnonymous: z.union([z.boolean(), z.string().transform((v) => v === "true")]).optional(),
+  isSevere: z.union([z.boolean(), z.string().transform((v) => v === "true")]).optional()
+});
+
+export const naacInspectionSchema = z.object({
+  inspectorName: z.string().min(2, "Inspector name is required"),
+  inspectorDesignation: z.string().min(2, "Inspector designation is required"),
+  inspectionFindings: z.string().min(5, "Inspection findings are required"),
+  verifiedSeverity: z.string().optional(),
+  directiveSlaHours: z.coerce.number().optional()
+});
+
+export const naacActionConfirmSchema = z.object({
+  actionType: z.string().min(3, "Action type is required"),
+  actionDetails: z.string().min(5, "Action details are required"),
+  complianceGrade: z.string().optional(),
+  directiveSlaHours: z.coerce.number().optional(),
+  inspectorName: z.string().optional()
 });
 
 export const verifyOtpSchema = z.object({
@@ -132,7 +156,8 @@ export const getSimilarComplaints = asyncHandler(async (req, res) => {
  * Create a new complaint with media upload and auto-routing to department
  */
 export const createComplaint = asyncHandler(async (req, res) => {
-  const { title, description, category, block, floor, room, isAnonymous } = req.body;
+  const { title, description, category, block, floor, room, studentName, studentDept, isAnonymous, isSevere } = req.body;
+
 
   // Validate location exists in config tree
   const matchedBlock = CAMPUS_LOCATIONS.find((b) => b.block.toLowerCase() === block.trim().toLowerCase());
@@ -161,8 +186,13 @@ export const createComplaint = asyncHandler(async (req, res) => {
 
   try {
     // Initial priority calculation
-    const isEmergencyCategory = ["electrical", "leakage"].includes(category);
-    const initialPriority = isEmergencyCategory ? PRIORITIES.HIGH : PRIORITIES.LOW;
+    const isEmergencyCategory = ["ragging", "harassment", "electrical", "leakage"].includes(category);
+    const isSevereFlagged = Boolean(isSevere) || isEmergencyCategory || ["misuse", "food_mess"].includes(category);
+    const initialPriority = ["ragging", "harassment"].includes(category)
+      ? PRIORITIES.EMERGENCY
+      : isSevereFlagged
+      ? PRIORITIES.HIGH
+      : PRIORITIES.LOW;
 
     const { priorityScore } = calculatePriorityAndScore({
       category,
@@ -181,7 +211,13 @@ export const createComplaint = asyncHandler(async (req, res) => {
         status: STATUSES.SUBMITTED,
         changedBy: req.user._id,
         at: new Date(),
-        note: "Complaint submitted by student."
+        note: category === "ragging"
+          ? "🚨 URGENT: Anti-Ragging Grievance Registered - Zero-Tolerance Emergency SLA & NAAC Committee Notification Dispatched."
+          : category === "misuse"
+          ? "Campus Facility / Asset Misuse Grievance Reported - Dispatched to Discipline & Security Oversight."
+          : isSevereFlagged
+          ? "Severe Complaint submitted by student - Flagged for NAAC Committee Inspection."
+          : "Complaint submitted by student."
       }
     ];
 
@@ -232,6 +268,8 @@ export const createComplaint = asyncHandler(async (req, res) => {
       },
       attachments: uploadedAssets,
       createdBy: req.user._id,
+      studentName: (studentName || req.user.name || "").trim(),
+      studentDept: (studentDept || "General Student").trim(),
       isAnonymous: Boolean(isAnonymous),
       assignedTo: assignedStaff?._id || null,
       assignedAt: assignedStaff ? new Date() : null,
@@ -241,6 +279,24 @@ export const createComplaint = asyncHandler(async (req, res) => {
         breached: false,
         escalationLevel: 0
       },
+      naacReview: isSevereFlagged
+        ? {
+            isSevere: true,
+            requiresInspection: true,
+            inspectionStatus: NAAC_INSPECTION_STATUSES.PENDING_INSPECTION,
+            verifiedSeverity: category === "ragging"
+              ? "Critical Anti-Ragging Violation"
+              : category === "misuse"
+              ? "Campus Property & Resource Misuse"
+              : isEmergencyCategory
+              ? "Severe Hazard"
+              : "High Severity Infrastructure"
+          }
+        : {
+            isSevere: false,
+            requiresInspection: false,
+            inspectionStatus: NAAC_INSPECTION_STATUSES.NONE
+          },
       statusHistory: historyEntries
     });
 
@@ -779,3 +835,316 @@ export const reopenComplaint = asyncHandler(async (req, res) => {
     )
   );
 });
+
+/**
+ * GET /api/complaints/naac/severe
+ * Fetch all severe grievances flagged for or requiring NAAC Inspection
+ */
+export const getSevereNaacComplaints = asyncHandler(async (req, res) => {
+  const { status, search } = req.query;
+  const query = {
+    $or: [
+      { "naacReview.isSevere": true },
+      { priority: { $in: [PRIORITIES.HIGH, PRIORITIES.EMERGENCY] } },
+      { "sla.breached": true }
+    ]
+  };
+
+  if (status && status !== "all") {
+    query["naacReview.inspectionStatus"] = status;
+  }
+
+  if (search && search.trim()) {
+    query.$and = [
+      {
+        $or: [
+          { title: { $regex: search.trim(), $options: "i" } },
+          { ticketId: { $regex: search.trim(), $options: "i" } },
+          { "location.fullPath": { $regex: search.trim(), $options: "i" } }
+        ]
+      }
+    ];
+  }
+
+  const complaints = await Complaint.find(query)
+    .populate("department", "name code")
+    .populate("assignedTo", "name email role staffType")
+    .populate("createdBy", "name email role")
+    .populate("naacReview.inspectedBy", "name email role")
+    .populate("naacReview.actionConfirmedBy", "name email role")
+    .sort({ "naacReview.isSevere": -1, priorityScore: -1, createdAt: -1 });
+
+  const totalSevere = await Complaint.countDocuments({
+    $or: [{ "naacReview.isSevere": true }, { priority: { $in: [PRIORITIES.HIGH, PRIORITIES.EMERGENCY] } }]
+  });
+  const pendingInspection = await Complaint.countDocuments({
+    $or: [{ "naacReview.isSevere": true }, { priority: { $in: [PRIORITIES.HIGH, PRIORITIES.EMERGENCY] } }],
+    "naacReview.inspectionStatus": { $in: ["none", "pending_inspection"] }
+  });
+  const inspected = await Complaint.countDocuments({
+    "naacReview.inspectionStatus": "inspected"
+  });
+  const actionConfirmed = await Complaint.countDocuments({
+    "naacReview.inspectionStatus": "action_confirmed"
+  });
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        stats: {
+          totalSevere,
+          pendingInspection,
+          inspected,
+          actionConfirmed
+        },
+        complaints: complaints.map((c) => (c.toPublicJSON ? c.toPublicJSON(req.user?._id) : c))
+      },
+      "Severe NAAC complaints fetched."
+    )
+  );
+});
+
+/**
+ * POST /api/complaints/:id/naac-inspect
+ * Record on-site NAAC Inspection Visit findings
+ */
+export const conductNaacInspection = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { inspectorName, inspectorDesignation, inspectionFindings, verifiedSeverity, directiveSlaHours } = req.body;
+
+  const complaint = await Complaint.findById(id);
+  if (!complaint) {
+    throw new ApiError(404, "Complaint not found.");
+  }
+
+  const now = new Date();
+  const inspector = inspectorName || req.user.name;
+  const designation = inspectorDesignation || "NAAC Quality Committee Member";
+
+  complaint.naacReview = {
+    ...complaint.naacReview,
+    isSevere: true,
+    requiresInspection: true,
+    inspectionStatus: NAAC_INSPECTION_STATUSES.INSPECTED,
+    inspectedAt: now,
+    inspectedBy: req.user._id,
+    inspectorName: inspector,
+    inspectorDesignation: designation,
+    inspectionFindings,
+    verifiedSeverity: verifiedSeverity || "Severe Hazard",
+    directiveSlaHours: directiveSlaHours ? Number(directiveSlaHours) : complaint.naacReview?.directiveSlaHours
+  };
+
+  complaint.statusHistory.push({
+    status: complaint.status,
+    changedBy: req.user._id,
+    at: now,
+    note: `NAAC On-site Inspection completed by ${inspector} (${designation}). Observation: "${inspectionFindings}"`
+  });
+
+  await complaint.save();
+
+  await createAuditLog({
+    action: AUDIT_ACTIONS.NAAC_INSPECTION_CONDUCTED,
+    entityType: "Complaint",
+    entityId: complaint._id,
+    performedBy: req.user._id,
+    ipAddress: req.ip,
+    metadata: {
+      ticketId: complaint.ticketId,
+      inspectorName: inspector,
+      inspectorDesignation: designation,
+      findings: inspectionFindings
+    }
+  });
+
+  const updatedComplaint = await Complaint.findById(complaint._id)
+    .populate("department", "name code")
+    .populate("assignedTo", "name email role staffType")
+    .populate("createdBy", "name email role")
+    .populate("naacReview.inspectedBy", "name email role");
+
+  await notifyNaacInspected(updatedComplaint);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      { complaint: updatedComplaint.toPublicJSON(req.user._id) },
+      "NAAC Inspection Visit logged successfully."
+    )
+  );
+});
+
+/**
+ * POST /api/complaints/:id/naac-action-confirm
+ * Take action and generate official NAAC Action Confirmation Slip
+ */
+export const confirmNaacAction = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { actionType, actionDetails, complianceGrade, directiveSlaHours, inspectorName } = req.body;
+
+  const complaint = await Complaint.findById(id);
+  if (!complaint) {
+    throw new ApiError(404, "Complaint not found.");
+  }
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const randomCode = Math.floor(1000 + Math.random() * 9000);
+  const actionConfirmationSlipId = `NAAC-ACT-${year}-${randomCode}`;
+
+  complaint.naacReview = {
+    ...complaint.naacReview,
+    isSevere: true,
+    inspectionStatus: NAAC_INSPECTION_STATUSES.ACTION_CONFIRMED,
+    actionType,
+    actionDetails,
+    actionConfirmedAt: now,
+    actionConfirmedBy: req.user._id,
+    actionConfirmationSlipId,
+    complianceGrade: complianceGrade || "A+",
+    directiveSlaHours: directiveSlaHours ? Number(directiveSlaHours) : 4,
+    inspectorName: inspectorName || complaint.naacReview?.inspectorName || req.user.name
+  };
+
+  // Adjust SLA deadline strictly if directive SLA hours provided
+  if (directiveSlaHours) {
+    const hours = Number(directiveSlaHours);
+    complaint.sla.dueAt = new Date(now.getTime() + hours * 60 * 60 * 1000);
+    complaint.sla.hours = hours;
+  }
+
+  complaint.statusHistory.push({
+    status: complaint.status,
+    changedBy: req.user._id,
+    at: now,
+    note: `NAAC Official Action Confirmed: [${actionType}]. Slip ID: ${actionConfirmationSlipId}. Directive: "${actionDetails}"`
+  });
+
+  await complaint.save();
+
+  await createAuditLog({
+    action: AUDIT_ACTIONS.NAAC_ACTION_CONFIRMED,
+    entityType: "Complaint",
+    entityId: complaint._id,
+    performedBy: req.user._id,
+    ipAddress: req.ip,
+    metadata: {
+      ticketId: complaint.ticketId,
+      actionConfirmationSlipId,
+      actionType,
+      actionDetails,
+      complianceGrade
+    }
+  });
+
+  const updatedComplaint = await Complaint.findById(complaint._id)
+    .populate("department", "name code")
+    .populate("assignedTo", "name email role staffType")
+    .populate("createdBy", "name email role")
+    .populate("naacReview.inspectedBy", "name email role")
+    .populate("naacReview.actionConfirmedBy", "name email role");
+
+  await notifyNaacActionConfirmed(updatedComplaint);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        complaint: updatedComplaint.toPublicJSON(req.user._id),
+        confirmationSlip: {
+          slipId: actionConfirmationSlipId,
+          ticketId: complaint.ticketId,
+          complaintTitle: complaint.title,
+          location: complaint.location?.fullPath,
+          actionType,
+          actionDetails,
+          complianceGrade: complianceGrade || "A+",
+          confirmedAt: now,
+          confirmedByName: req.user.name,
+          confirmedByRole: req.user.role,
+          collegeName: "Smart College of Engineering & Technology",
+          naacAccreditationCycle: "Cycle 4 - Institutional Grievance & Redressal Cell"
+        }
+      },
+      "NAAC Action Confirmed and Official Slip generated."
+    )
+  );
+});
+
+/**
+ * GET /api/complaints/:id/naac-action-slip
+ * Fetch official verified NAAC action slip
+ */
+export const getNaacActionSlip = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const complaint = await Complaint.findById(id)
+    .populate("department", "name code")
+    .populate("assignedTo", "name email role staffType")
+    .populate("createdBy", "name email role")
+    .populate("naacReview.inspectedBy", "name email role")
+    .populate("naacReview.actionConfirmedBy", "name email role");
+
+  if (!complaint) {
+    throw new ApiError(404, "Complaint not found.");
+  }
+
+  if (!complaint.naacReview?.actionConfirmationSlipId) {
+    throw new ApiError(400, "NAAC Action Confirmation Slip has not been generated for this complaint yet.");
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        slip: {
+          slipId: complaint.naacReview.actionConfirmationSlipId,
+          ticketId: complaint.ticketId,
+          complaintTitle: complaint.title,
+          category: complaint.category,
+          location: complaint.location?.fullPath,
+          studentName: complaint.isAnonymous ? "Anonymous Student" : complaint.createdBy?.name,
+          studentEmail: complaint.isAnonymous ? "Protected" : complaint.createdBy?.email,
+          inspectionFindings: complaint.naacReview.inspectionFindings,
+          inspectedAt: complaint.naacReview.inspectedAt,
+          inspectorName: complaint.naacReview.inspectorName,
+          inspectorDesignation: complaint.naacReview.inspectorDesignation,
+          actionType: complaint.naacReview.actionType,
+          actionDetails: complaint.naacReview.actionDetails,
+          complianceGrade: complaint.naacReview.complianceGrade,
+          confirmedAt: complaint.naacReview.actionConfirmedAt,
+          confirmedBy: complaint.naacReview.actionConfirmedBy?.name || "NAAC Quality Officer",
+          department: complaint.department?.name,
+          assignedTechnician: complaint.assignedTo?.name || "Pending Assignment",
+          collegeName: "Smart College of Engineering & Technology",
+          accreditationRef: "NAAC-SSR-CRITERION-V-STUDENT-SUPPORT-V2"
+        }
+      },
+      "NAAC Action Slip fetched successfully."
+    )
+  );
+});
+
+/**
+ * POST /api/complaints/:id/trigger-3day-escalation
+ * Simulate / trigger statutory 3-day inaction escalation to NAAC Higher Committee
+ */
+export const trigger3DayEscalation = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const complaint = await Complaint.findById(id);
+  if (!complaint) {
+    throw new ApiError(404, "Complaint not found.");
+  }
+
+  // Set created date to 3.5 days ago to reflect 3-day inaction
+  complaint.createdAt = new Date(Date.now() - 3.5 * 24 * 60 * 60 * 1000);
+  await complaint.save();
+
+  const escalated = await escalateComplaint(id, "3-Day Inaction SLA Breach - Mandatory NAAC Institutional Oversight Triggered");
+
+  return res.status(200).json(
+    new ApiResponse(200, { complaint: escalated?.toPublicJSON(req.user._id) || complaint }, "Ticket escalated to NAAC Higher Committee due to 3-day inaction.")
+  );
+});
+

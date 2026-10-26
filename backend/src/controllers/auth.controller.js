@@ -35,9 +35,10 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.string().min(1, "Name, Username, or Email is required"),
   password: z.string().min(1, "Password is required")
 });
+
 
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
@@ -136,14 +137,31 @@ export const register = asyncHandler(async (req, res) => {
  */
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
+  const identifier = (email || "").trim();
 
-  const user = await User.findOne({ email: email.toLowerCase() })
+  const isEmail = identifier.includes("@");
+  let query;
+  if (isEmail) {
+    query = { email: identifier.toLowerCase() };
+  } else {
+    const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    query = {
+      $or: [
+        { name: { $regex: new RegExp(`^${escaped}$`, "i") } },
+        { name: { $regex: new RegExp(escaped, "i") } },
+        { email: identifier.toLowerCase() }
+      ]
+    };
+  }
+
+  const user = await User.findOne(query)
     .select("+password +refreshTokenHash")
     .populate("department");
 
   if (!user) {
-    throw new ApiError(401, "Invalid email or password.");
+    throw new ApiError(401, "Invalid name/email or password.");
   }
+
 
   // Check account lockout
   if (user.isLocked()) {

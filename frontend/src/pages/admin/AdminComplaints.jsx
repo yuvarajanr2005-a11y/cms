@@ -192,6 +192,24 @@ export const AdminComplaints = () => {
                     </td>
 
                     <td className="py-3.5 px-4 max-w-xs">
+                      <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                        <span className={`capitalize px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                          c.category === "ragging"
+                            ? "bg-red-100 text-red-800 border-red-300 font-bold"
+                            : c.category === "misuse"
+                            ? "bg-amber-100 text-amber-800 border-amber-300"
+                            : c.category === "harassment"
+                            ? "bg-rose-100 text-rose-800 border-rose-300"
+                            : "bg-neutral-100 text-neutral-700 border-neutral-200"
+                        }`}>
+                          {c.category === "ragging" ? "🚨 Anti-Ragging" : c.category === "misuse" ? "⚠️ Misuse" : c.category?.replace("_", " ")}
+                        </span>
+                        {c.isSevere && (
+                          <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[9px] uppercase border border-amber-300">
+                            NAAC Review
+                          </span>
+                        )}
+                      </div>
                       <p className="font-semibold text-neutral-900 truncate">{c.title}</p>
                       <p className="text-[11px] text-neutral-500 truncate">📍 {c.location?.fullPath}</p>
                     </td>

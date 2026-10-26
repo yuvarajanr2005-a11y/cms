@@ -1,7 +1,15 @@
 export const ROLES = {
   STUDENT: "student",
   STAFF: "staff",
-  ADMIN: "admin"
+  ADMIN: "admin",
+  NAAC: "naac"
+};
+
+export const NAAC_INSPECTION_STATUSES = {
+  NONE: "none",
+  PENDING_INSPECTION: "pending_inspection",
+  INSPECTED: "inspected",
+  ACTION_CONFIRMED: "action_confirmed"
 };
 
 export const STAFF_TYPES = {
@@ -10,13 +18,22 @@ export const STAFF_TYPES = {
 };
 
 export const CATEGORIES = [
+  "ragging",
+  "misuse",
+  "harassment",
+  "food_mess",
   "electrical",
   "leakage",
-  "wifi",
-  "furniture",
-  "painting",
   "plumbing",
+  "academic",
+  "wifi",
+  "hostel",
+  "transport",
+  "library",
+  "sports",
+  "furniture",
   "cleaning",
+  "painting",
   "other"
 ];
 
@@ -58,13 +75,22 @@ export const SLA_HOURS = {
 
 // Base weight by category
 export const CATEGORY_BASE_WEIGHTS = {
+  ragging: 50,
+  harassment: 45,
+  misuse: 35,
   electrical: 30,
   leakage: 30,
-  wifi: 20,
-  furniture: 15,
+  food_mess: 30,
   plumbing: 25,
-  painting: 10,
+  academic: 25,
+  hostel: 25,
+  wifi: 20,
+  transport: 20,
+  library: 15,
+  sports: 15,
+  furniture: 15,
   cleaning: 15,
+  painting: 10,
   other: 10
 };
 
@@ -92,7 +118,9 @@ export const AUDIT_ACTIONS = {
   DEPARTMENT_CREATED: "DEPARTMENT_CREATED",
   DEPARTMENT_UPDATED: "DEPARTMENT_UPDATED",
   USER_CREATED: "USER_CREATED",
-  USER_UPDATED: "USER_UPDATED"
+  USER_UPDATED: "USER_UPDATED",
+  NAAC_INSPECTION_CONDUCTED: "NAAC_INSPECTION_CONDUCTED",
+  NAAC_ACTION_CONFIRMED: "NAAC_ACTION_CONFIRMED"
 };
 
 // Cascading Campus Locations Definition

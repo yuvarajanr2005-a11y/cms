@@ -26,7 +26,15 @@ export const escalateComplaint = async (complaintId, reason = "SLA Breach") => {
 
   // Determine escalation contact based on level
   let contactUser = null;
-  if (newLevel === 1 && complaint.department?.head) {
+  const is3DayBreach = reason.includes("3-Day") || reason.includes("72-Hour");
+
+  if (newLevel >= 3 || is3DayBreach) {
+    // Level 3+: Escalated directly to NAAC Higher Oversight Committee
+    contactUser = await User.findOne({ role: ROLES.NAAC, isActive: true });
+    if (!contactUser) {
+      contactUser = await User.findOne({ role: ROLES.ADMIN, isActive: true });
+    }
+  } else if (newLevel === 1 && complaint.department?.head) {
     contactUser = await User.findById(complaint.department.head);
   } else if (complaint.department?.escalationContact) {
     contactUser = await User.findById(complaint.department.escalationContact);
@@ -46,18 +54,30 @@ export const escalateComplaint = async (complaintId, reason = "SLA Breach") => {
         status: STATUSES.ESCALATED,
         "sla.breached": true,
         "sla.escalatedAt": new Date(),
-        "sla.escalationLevel": newLevel
+        "sla.escalationLevel": Math.max(newLevel, is3DayBreach ? 3 : newLevel),
+        ...(is3DayBreach || newLevel >= 3
+          ? {
+              "naacReview.isSevere": true,
+              "naacReview.requiresInspection": true,
+              "naacReview.breach3Days": true,
+              "naacReview.inspectionStatus": "pending_inspection",
+              "naacReview.verifiedSeverity": "Statutory 3-Day Inaction Breach - Non-Compliance with NAAC Criterion 5.1.4"
+            }
+          : {})
       },
       $push: {
         statusHistory: {
           status: STATUSES.ESCALATED,
           at: new Date(),
-          note: `Auto-escalated to Level ${newLevel}. Reason: ${reason}`
+          note: is3DayBreach || newLevel >= 3
+            ? `🚨 CRITICAL: Escalated to NAAC Higher Accreditation Committee due to > 3 Days (72 Hours) complete inaction. Action against College / Department pending.`
+            : `Auto-escalated to Level ${newLevel}. Reason: ${reason}`
         }
       }
     },
     { new: true }
   ).populate("department createdBy assignedTo");
+
 
   if (!updatedComplaint) {
     return null; // Concurrently updated by another process

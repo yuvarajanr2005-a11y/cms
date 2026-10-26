@@ -191,13 +191,27 @@ export const StaffDashboard = () => {
                     <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-500">
                       <span>📍 {item.location?.fullPath}</span>
                       <span>•</span>
-                      <span>Logged by: {item.createdBy?.name || "Student"}</span>
+                      <span>
+                        Student: <strong className="text-neutral-900">{item.studentName || item.createdBy?.name || "Student"}</strong>
+                        {item.studentDept && (
+                          <span className="ml-1 px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-800 font-semibold">
+                            {item.studentDept}
+                          </span>
+                        )}
+                      </span>
                       {item.department?.name && <span>• Dept: {item.department.name}</span>}
                     </div>
+
+                    {item.attachments && item.attachments.length > 0 && (
+                      <div className="flex items-center gap-2 pt-1 text-[11px] text-indigo-700 font-semibold">
+                        <span>📸 {item.attachments.length} Problem Photo(s) Attached by Student</span>
+                      </div>
+                    )}
 
                     <p className="text-xs text-neutral-600 line-clamp-2 leading-relaxed pt-1">
                       {item.description}
                     </p>
+
                   </div>
 
                   {/* Actions & SLA urgency badge */}

@@ -101,11 +101,16 @@ const processSlaBreaches = async () => {
 
   for (const ticket of breachedTickets) {
     try {
-      // If already at level 2 or escalated in last 6 hours, avoid rapid duplicate loop
+      const hoursSinceCreation = (now.getTime() - new Date(ticket.createdAt).getTime()) / (1000 * 60 * 60);
       const lastEscalated = ticket.sla.escalatedAt ? new Date(ticket.sla.escalatedAt).getTime() : 0;
       const hoursSinceEscalation = (now.getTime() - lastEscalated) / (1000 * 60 * 60);
 
-      if (!ticket.sla.escalatedAt || (ticket.sla.escalationLevel < 2 && hoursSinceEscalation >= 6)) {
+      // Condition 1: 3 Days (72 Hours) passed without action -> Mandatory NAAC Escalation
+      if (hoursSinceCreation >= 72 && (ticket.sla.escalationLevel < 3 || hoursSinceEscalation >= 6)) {
+        await escalateComplaint(ticket._id, "3-Day Inaction SLA Breach - Mandatory NAAC Institutional Oversight Triggered");
+      }
+      // Condition 2: Regular SLA dueAt breach
+      else if (!ticket.sla.escalatedAt || (ticket.sla.escalationLevel < 2 && hoursSinceEscalation >= 6)) {
         await escalateComplaint(ticket._id, "SLA Resolution Deadline Breached");
       }
     } catch (err) {
@@ -113,6 +118,7 @@ const processSlaBreaches = async () => {
     }
   }
 };
+
 
 /**
  * Task C: Auto-Close Stale Pending Verification Tickets after 48 hours

@@ -51,16 +51,20 @@ export const notifyComplaintCreated = async (complaint) => {
   const safeData = complaint.toPublicJSON ? complaint.toPublicJSON() : complaint;
   emitToRole("admin", "complaint:created", safeData);
   emitToRole("staff", "complaint:created", safeData);
+  emitToRole("naac", "complaint:created", safeData);
   emitGlobal("complaint:created", safeData);
   if (complaint.department) {
     const deptId = complaint.department?._id || complaint.department;
     emitToDepartment(deptId, "complaint:created", safeData);
   }
+  const studentIdentifier = complaint.studentName || complaint.createdBy?.name || "Student";
+  const deptIdentifier = complaint.studentDept ? ` [${complaint.studentDept}]` : "";
   emitGlobal("notification:new", {
     type: "complaint:created",
-    title: "New Complaint Registered",
-    message: `Ticket ${complaint.ticketId}: ${complaint.title} in ${complaint.location?.block || "Campus"}`,
-    ticketId: complaint.ticketId
+    title: `🚨 New Grievance #${complaint.ticketId} Sent to HOD`,
+    message: `${studentIdentifier}${deptIdentifier} lodged: "${complaint.title}" (${complaint.location?.block || "Campus"}). Dispatched to Department Head.`,
+    ticketId: complaint.ticketId,
+    receivedAt: new Date()
   });
 };
 
@@ -254,3 +258,32 @@ export const notifyComplaintReopened = async (complaint, reason) => {
 
   emitToRole("admin", "complaint:reopened", safeData);
 };
+
+/**
+ * Notification on NAAC Inspection Conducted
+ */
+export const notifyNaacInspected = async (complaint) => {
+  const safeData = complaint.toPublicJSON ? complaint.toPublicJSON() : complaint;
+  emitGlobal("complaint:naac_inspected", safeData);
+  emitGlobal("notification:new", {
+    type: "naac:inspected",
+    title: "🏛️ NAAC Inspection Visit Conducted",
+    message: `NAAC Committee inspected severe complaint ${complaint.ticketId}: "${complaint.title}". Observation recorded.`,
+    ticketId: complaint.ticketId
+  });
+};
+
+/**
+ * Notification on NAAC Action Confirmed
+ */
+export const notifyNaacActionConfirmed = async (complaint) => {
+  const safeData = complaint.toPublicJSON ? complaint.toPublicJSON() : complaint;
+  emitGlobal("complaint:naac_action_confirmed", safeData);
+  emitGlobal("notification:new", {
+    type: "naac:action_confirmed",
+    title: "✅ NAAC Severe Action Confirmed",
+    message: `Official NAAC Directive confirmed for ${complaint.ticketId} [Slip ID: ${complaint.naacReview?.actionConfirmationSlipId}]. Action: ${complaint.naacReview?.actionType}.`,
+    ticketId: complaint.ticketId
+  });
+};
+

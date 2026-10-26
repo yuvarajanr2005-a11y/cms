@@ -80,6 +80,14 @@ const complaintSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    studentName: {
+      type: String,
+      default: ""
+    },
+    studentDept: {
+      type: String,
+      default: ""
+    },
     isAnonymous: {
       type: Boolean,
       default: false
@@ -145,6 +153,29 @@ const complaintSchema = new mongoose.Schema(
         }
       ],
       lastReopenedAt: { type: Date, default: null }
+    },
+    naacReview: {
+      isSevere: { type: Boolean, default: false, index: true },
+      requiresInspection: { type: Boolean, default: false },
+      inspectionStatus: {
+        type: String,
+        enum: ["none", "pending_inspection", "inspected", "action_confirmed"],
+        default: "none",
+        index: true
+      },
+      inspectedAt: { type: Date, default: null },
+      inspectedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      inspectorName: { type: String, default: null },
+      inspectorDesignation: { type: String, default: null },
+      inspectionFindings: { type: String, default: null },
+      verifiedSeverity: { type: String, default: null },
+      actionType: { type: String, default: null },
+      actionDetails: { type: String, default: null },
+      actionConfirmedAt: { type: Date, default: null },
+      actionConfirmedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      actionConfirmationSlipId: { type: String, default: null, index: true },
+      complianceGrade: { type: String, default: null },
+      directiveSlaHours: { type: Number, default: null }
     },
     statusHistory: [
       {

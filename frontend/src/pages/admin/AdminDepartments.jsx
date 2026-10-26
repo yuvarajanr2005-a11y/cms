@@ -3,13 +3,22 @@ import { Building2, Plus, Users, Shield, Wrench, Loader2, X } from "lucide-react
 import api from "../../api/axios";
 
 const ALL_CATEGORIES = [
+  "ragging",
+  "misuse",
+  "harassment",
+  "food_mess",
   "electrical",
   "leakage",
-  "wifi",
-  "furniture",
-  "painting",
   "plumbing",
+  "academic",
+  "wifi",
+  "hostel",
+  "transport",
+  "library",
+  "sports",
+  "furniture",
   "cleaning",
+  "painting",
   "other"
 ];
 

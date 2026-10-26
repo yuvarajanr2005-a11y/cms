@@ -14,7 +14,9 @@ import {
   Loader2,
   AlertTriangle,
   History,
-  Building
+  Building,
+  Award,
+  ClipboardCheck
 } from "lucide-react";
 import api from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
@@ -43,6 +45,24 @@ export const ComplaintDetails = () => {
   const [showReopenModal, setShowReopenModal] = useState(false);
   const [showProofModal, setShowProofModal] = useState(false);
   const [expandedImage, setExpandedImage] = useState(null);
+  const [triggeringEscalation, setTriggeringEscalation] = useState(false);
+  const [escalationFeedback, setEscalationFeedback] = useState("");
+
+  const handleTrigger3DayEscalation = async () => {
+    setTriggeringEscalation(true);
+    setEscalationFeedback("");
+    try {
+      const res = await api.post(`/complaints/${id}/trigger-3day-escalation`);
+      if (res.data?.success) {
+        setEscalationFeedback("🚨 Ticket escalated to NAAC Higher Oversight Committee due to 3-day complete inaction!");
+        fetchComplaint();
+      }
+    } catch (err) {
+      alert("Escalation failed: " + (err.response?.data?.message || err.message));
+    } finally {
+      setTriggeringEscalation(false);
+    }
+  };
 
   const fetchComplaint = useCallback(async () => {
     try {
@@ -60,6 +80,7 @@ export const ComplaintDetails = () => {
   useEffect(() => {
     fetchComplaint();
   }, [fetchComplaint]);
+
 
   useEffect(() => {
     if (!socket) return;
@@ -118,10 +139,17 @@ export const ComplaintDetails = () => {
         complaint.resolution?.resolvedAt &&
         Date.now() - new Date(complaint.resolution.resolvedAt).getTime() <= 48 * 60 * 60 * 1000));
 
+  const is3DaysBreach =
+    complaint.sla?.escalationLevel >= 3 ||
+    complaint.naacReview?.breach3Days ||
+    (complaint.createdAt &&
+      Date.now() - new Date(complaint.createdAt).getTime() >= 3 * 24 * 60 * 60 * 1000 &&
+      !["closed", "pending_verification"].includes(complaint.status));
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Top Navigation */}
-      <div className="flex items-center justify-between">
+      {/* Top Navigation & Action Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           to="/student/dashboard"
           className="inline-flex items-center gap-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition"
@@ -130,13 +158,72 @@ export const ComplaintDetails = () => {
           <span>Back to Dashboard</span>
         </Link>
 
-        <UpvoteButton
-          complaintId={complaint._id}
-          initialCount={complaint.upvoteCount}
-          initialUpvoted={false}
-          creatorId={complaint.createdBy}
-        />
+        <div className="flex items-center gap-2">
+          {!isClosed && !is3DaysBreach && (
+            <button
+              type="button"
+              onClick={handleTrigger3DayEscalation}
+              disabled={triggeringEscalation}
+              className="px-3.5 py-1.5 rounded-xl border border-red-300 bg-red-50 hover:bg-red-100 text-red-800 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs"
+            >
+              {triggeringEscalation ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+              )}
+              <span>Simulate 3 Days Inaction (Trigger NAAC Oversight)</span>
+            </button>
+          )}
+
+          <UpvoteButton
+            complaintId={complaint._id}
+            initialCount={complaint.upvoteCount}
+            initialUpvoted={false}
+            creatorId={complaint.createdBy}
+          />
+        </div>
       </div>
+
+      {/* Escalation Feedback Alert */}
+      {escalationFeedback && (
+        <div className="p-4 bg-red-50 border border-red-300 rounded-2xl text-xs text-red-900 flex items-center justify-between animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 font-bold">
+            <AlertTriangle className="w-4 h-4 text-red-600" />
+            <span>{escalationFeedback}</span>
+          </div>
+          <button onClick={() => setEscalationFeedback("")} className="text-red-500 hover:text-black">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* 3-Day NAAC Statutory Oversight Banner */}
+      {is3DaysBreach && (
+        <div className="p-5 rounded-3xl bg-gradient-to-r from-red-600 via-rose-700 to-neutral-900 text-white space-y-3 shadow-xl border-2 border-red-500">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-[10px] font-black uppercase tracking-wider">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-300" />
+                <span>NAAC Higher Accreditation Committee Jurisdiction</span>
+              </div>
+              <h3 className="text-lg font-black tracking-tight">
+                🚨 Statutory 3-Day Inaction Breach: Direct Action Initiated on College
+              </h3>
+              <p className="text-xs text-red-100 leading-relaxed max-w-2xl">
+                This grievance remained unresolved for over 3 days (72 hours). Under NAAC Criterion 5.1.4, institutional oversight has assumed jurisdiction. The NAAC Quality Committee can issue formal disciplinary orders and adjust the department&apos;s compliance rating.
+              </p>
+            </div>
+
+            <Link
+              to={`/complaints/${complaint._id}/naac-confirm`}
+              className="px-4 py-2.5 bg-white text-red-950 font-black rounded-xl text-xs shadow-lg hover:bg-red-50 transition shrink-0 flex items-center gap-2 self-start sm:self-auto"
+            >
+              <Award className="w-4 h-4 text-amber-600" />
+              <span>Issue NAAC Action Slip</span>
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Main Header Card */}
       <div className="p-6 rounded-2xl bg-white border border-neutral-200 shadow-sm space-y-4">
@@ -150,6 +237,11 @@ export const ComplaintDetails = () => {
             {complaint.isAnonymous && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-100 text-neutral-700 border border-neutral-200">
                 <Shield className="w-3 h-3 text-neutral-600" /> Anonymous
+              </span>
+            )}
+            {is3DaysBreach && (
+              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-red-600 text-white animate-pulse">
+                &gt;3 Days: NAAC Jurisdiction
               </span>
             )}
           </div>
@@ -169,13 +261,25 @@ export const ComplaintDetails = () => {
 
         <div className="flex flex-wrap items-center gap-4 text-xs text-neutral-500 pt-2 border-t border-neutral-100">
           <div className="flex items-center gap-1.5">
+            <User className="w-4 h-4 text-neutral-900" />
+            <span>
+              Student: <strong className="text-neutral-900">{complaint.studentName || complaint.createdBy?.name || "Student"}</strong>
+              {complaint.studentDept && (
+                <span className="ml-1 px-1.5 py-0.5 rounded bg-neutral-100 font-semibold text-neutral-700">
+                  {complaint.studentDept}
+                </span>
+              )}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
             <MapPin className="w-4 h-4 text-neutral-900" />
             <span>{complaint.location?.fullPath}</span>
           </div>
 
           <div className="flex items-center gap-1.5">
             <Building className="w-4 h-4 text-neutral-700" />
-            <span>Department: {complaint.department?.name || "General"}</span>
+            <span>Assigned Dept: {complaint.department?.name || "General Maintenance"}</span>
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -184,6 +288,7 @@ export const ComplaintDetails = () => {
           </div>
         </div>
       </div>
+
 
       {/* Dual Proof-of-Work Verification Alert Banner (if pending verification) */}
       {isPendingVerification && (
@@ -236,6 +341,89 @@ export const ComplaintDetails = () => {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* NAAC Inspection & Severe Action Card */}
+      {(complaint.naacReview?.isSevere || complaint.priority === "emergency" || complaint.priority === "high") && (
+        <div className="p-6 rounded-2xl bg-gradient-to-r from-amber-50/80 via-white to-amber-50/40 border-2 border-amber-300 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-amber-200/80">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-xs">
+                <Award className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-neutral-900">
+                  NAAC Committee Severe Grievance Oversight
+                </h3>
+                <p className="text-[11px] text-neutral-500">
+                  Autonomous Quality Assurance &amp; Criterion V Accreditation Review
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {complaint.naacReview?.inspectionStatus === "action_confirmed" ? (
+                <span className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  Action Confirmed: {complaint.naacReview?.actionConfirmationSlipId}
+                </span>
+              ) : complaint.naacReview?.inspectionStatus === "inspected" ? (
+                <span className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full bg-blue-100 text-blue-800 border border-blue-300">
+                  <ClipboardCheck className="w-3.5 h-3.5 text-blue-600" />
+                  On-Site Visit Inspected
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                  Flagged for NAAC Inspection Visit
+                </span>
+              )}
+            </div>
+          </div>
+
+          {complaint.naacReview?.inspectionFindings && (
+            <div className="p-3.5 rounded-xl bg-white border border-amber-200 space-y-1 text-xs">
+              <div className="flex items-center justify-between font-bold text-amber-950 text-[11px]">
+                <span>On-Site Observation ({complaint.naacReview.inspectorName})</span>
+                <span className="text-neutral-500 font-normal">
+                  {complaint.naacReview.inspectedAt ? new Date(complaint.naacReview.inspectedAt).toLocaleString() : ""}
+                </span>
+              </div>
+              <p className="text-neutral-800 leading-relaxed">{complaint.naacReview.inspectionFindings}</p>
+            </div>
+          )}
+
+          {complaint.naacReview?.actionType && (
+            <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1 text-xs">
+              <div className="flex items-center justify-between font-bold text-emerald-950 text-[11px]">
+                <span>Approved Action Directive [Slip ID: {complaint.naacReview.actionConfirmationSlipId}]</span>
+                <span className="px-2 py-0.5 rounded bg-emerald-200 text-emerald-900 font-bold">
+                  Grade {complaint.naacReview.complianceGrade || "A+"}
+                </span>
+              </div>
+              <p className="font-semibold text-neutral-900">{complaint.naacReview.actionType}</p>
+              <p className="text-neutral-700">{complaint.naacReview.actionDetails}</p>
+            </div>
+          )}
+
+          {/* Action Navigation */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+            <span className="text-[11px] text-neutral-500">
+              NAAC Committee Peer Team performs on-site verification and issues binding action slips.
+            </span>
+            <Link
+              to={`/complaints/${complaint._id}/naac-confirm`}
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition flex items-center gap-1.5 shadow-sm shrink-0 self-start sm:self-auto"
+            >
+              <Award className="w-3.5 h-3.5" />
+              <span>
+                {complaint.naacReview?.inspectionStatus === "action_confirmed"
+                  ? "View Official Action Slip"
+                  : "Go to NAAC Action Confirm Page"}
+              </span>
+            </Link>
+          </div>
         </div>
       )}
 
